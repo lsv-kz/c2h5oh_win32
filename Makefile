@@ -20,7 +20,7 @@ OBJS = $(OBJSDIR)/c2h5oh.o \
 	$(OBJSDIR)/range.o \
 	$(OBJSDIR)/encoding.o \
 	$(OBJSDIR)/functions.o \
-	$(OBJSDIR)/threads_manager.o \
+	$(OBJSDIR)/manager.o \
 	$(OBJSDIR)/event_handler.o \
 	$(OBJSDIR)/index.o \
 
@@ -60,7 +60,7 @@ $(OBJSDIR)/functions.o: functions.cpp main.h
 $(OBJSDIR)/send_files.o: send_files.cpp main.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
-$(OBJSDIR)/threads_manager.o: threads_manager.cpp main.h range.h
+$(OBJSDIR)/manager.o: manager.cpp main.h range.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(OBJSDIR)/cgi.o: cgi.cpp main.h
