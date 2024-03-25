@@ -3,8 +3,8 @@
 
 CC = g++.exe
 
-CFLAGS = -Wall -O2 -std=c++11 -m32
-#  -Wl,--stack,16777216 
+CFLAGS = -Wall -O2 -std=c++11
+#  -Wl,--stack,16777216  -m32
 
 OBJSDIR = objs
 

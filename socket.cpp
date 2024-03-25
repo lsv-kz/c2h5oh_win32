@@ -94,7 +94,7 @@ SOCKET create_server_socket(const Config * conf)
 
     struct linger l;
     l.l_onoff = 1;
-    l.l_linger = 2;
+    l.l_linger = 0;
     if (setsockopt(sockfd, SOL_SOCKET, SO_LINGER, (char*)&l, sizeof(l)))
     {
         PrintError(__func__, __LINE__, "Error setsockopt()", WSAGetLastError());
