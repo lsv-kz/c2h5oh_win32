@@ -73,8 +73,9 @@ int main_proc(const char* name_proc)
         << "\n   ip = " << conf->ServerAddr.c_str()
         << "\n   port = " << conf->ServerPort.c_str()
         << "\n   SndBufSize = " << conf->SndBufSize
-        << "\n\n   MaxParseReqThreads = " << conf->MaxParseReqThreads
-         << "\n   MinParseReqThreads = " << conf->MinParseReqThreads
+        << "\n\n   NumWorkThreads = " << conf->NumWorkThreads
+        << "\n   MaxParseReqThreads = " << conf->MaxParseReqThreads
+        << "\n   MinParseReqThreads = " << conf->MinParseReqThreads
         << "\n\n   ListenBacklog = " << conf->ListenBacklog
         << "\n   MaxAcceptConnections = " << conf->MaxAcceptConnections
         << "\n\n   MaxRequestsPerClient " << conf->MaxRequestsPerClient

@@ -1231,15 +1231,28 @@ int cgi_create_proc(Connect* r)
     {
         if (wcsstr(r->wScriptName.c_str(), L".pl") || wcsstr(r->wScriptName.c_str(), L".cgi"))
         {
-            commandLine = conf->wPerlPath + L' ' + wPath;
+            //commandLine = conf->wPerlPath + L' ' + wPath;
+            commandLine = L"\"";
+            commandLine += conf->wPerlPath;
+            commandLine += L"\" \"";
+            commandLine += wPath;
+            commandLine += L"\"";
         }
         else if (wcsstr(r->wScriptName.c_str(), L".py"))
         {
-            commandLine = conf->wPyPath + L' ' + wPath;
+            //commandLine = conf->wPyPath + L' ' + wPath;
+            commandLine = L"\"";
+            commandLine += conf->wPyPath;
+            commandLine += L"\" \"";
+            commandLine += wPath;
+            commandLine += L"\"";
         }
         else
         {
-            commandLine = wPath;
+            //commandLine = wPath;
+            commandLine = L"\"";
+            commandLine += wPath;
+            commandLine += L"\"";
         }
     }
     else
