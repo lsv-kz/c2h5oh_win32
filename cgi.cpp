@@ -138,13 +138,15 @@ void cgi_del_from_list(Connect *r)
 
         if (r->cgi.hChld != INVALID_HANDLE_VALUE)
         {
-            DWORD dwWait = WaitForSingleObject(r->cgi.hChld, 2);
+            DWORD dwWait = WaitForSingleObject(r->cgi.hChld, 1);
             switch (dwWait)
             {
                 case WAIT_OBJECT_0:
+                    //print_err(r, "<%s:%d> WAIT_OBJECT_0\n", __func__, __LINE__);
                     break;
                 case WAIT_TIMEOUT:
-                    if (!TerminateProcess(r->cgi.hChld, 0))
+                    print_err(r, "<%s:%d> WAIT_TIMEOUT\n", __func__, __LINE__);
+                    if (!TerminateProcess(r->cgi.hChld, 1))
                     {
                         DWORD err = GetLastError();
                         if (err != ERROR_ACCESS_DENIED)
@@ -158,6 +160,7 @@ void cgi_del_from_list(Connect *r)
                     print_err(r, "<%s:%d> default\n", __func__, __LINE__);
                     break;
             }
+
             if (!CloseHandle(r->cgi.hChld))
             {
                 PrintError(__func__, __LINE__, "CloseHandle", GetLastError());
@@ -253,7 +256,6 @@ mtx_.lock();
                 work_list_end->next = r;
             else
                 work_list_start = r;
-
             r->prev = work_list_end;
             r->next = NULL;
             work_list_end = r;
@@ -776,6 +778,7 @@ static void cgi_worker(Connect* r)
         }
         else if (ret == 0)// end
         {
+            r->cgi.status.cgi = CGI_CLOSE;
             cgi_del_from_list(r);
             end_response(r);
         }
@@ -1261,7 +1264,6 @@ int cgi_create_proc(Connect* r)
         return -RS500;
     }
     //------------------------------------------------------------------
-
     len = strlen(pipeName);
     snprintf(pipeName + len, sizeof(pipeName) - len, "%d-%lu-%lu", r->numThr, r->numConn, r->numReq);
     r->cgi.Pipe.parentPipe = CreateNamedPipeA(
@@ -1330,6 +1332,7 @@ int cgi_create_proc(Connect* r)
         DisconnectNamedPipe(r->cgi.Pipe.parentPipe);
         CloseHandle(r->cgi.Pipe.parentPipe);
         r->cgi.Pipe.parentPipe = INVALID_HANDLE_VALUE;
+        r->cgi.hChld = INVALID_HANDLE_VALUE;
         return -RS500;
     }
     else

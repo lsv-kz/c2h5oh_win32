@@ -238,15 +238,15 @@ void parse_request_thread()
             continue;
         }
 
-        req->err = prepare_response(req);
-        if (req->err == 1)
+        int err = prepare_response(req);
+        if (err == 1)
         {
             if (exit_thread(NULL))
                 return;
             continue;
         }
-        else if (req->err < 0)
-            ;
+        else if (err < 0)
+            req->err = err;
         else
         {
             print_err(req, "<%s:%d> !!! prepare_response()=%d\n", __func__, __LINE__, req->err);

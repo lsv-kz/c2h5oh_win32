@@ -78,7 +78,7 @@ enum IO_STATUS { SELECT = 1, WAIT_PIPE, WORK };
 enum CGI_TYPE { CGI_TYPE_NONE, CGI, PHPCGI, PHPFPM, FASTCGI, SCGI, };
 enum DIRECT { FROM_CGI = 1, TO_CGI, FROM_CLIENT, TO_CLIENT };
 
-enum CGI_STATUS  { CGI_CREATE_PROC = 1, CGI_STDIN, CGI_READ_HTTP_HEADERS, CGI_SEND_HTTP_HEADERS, CGI_SEND_ENTITY };
+enum CGI_STATUS  { CGI_CREATE_PROC = 1, CGI_STDIN, CGI_READ_HTTP_HEADERS, CGI_SEND_HTTP_HEADERS, CGI_SEND_ENTITY, CGI_CLOSE };
 
 enum FCGI_STATUS { FASTCGI_CONNECT = 1, FASTCGI_BEGIN, FASTCGI_PARAMS, FASTCGI_STDIN,
                FASTCGI_READ_HEADER, FASTCGI_READ_HTTP_HEADERS, FASTCGI_SEND_HTTP_HEADERS, FASTCGI_SEND_ENTITY,
@@ -175,6 +175,9 @@ struct hdr {
 };
 
 union STATUS { CGI_STATUS cgi; FCGI_STATUS fcgi; SCGI_STATUS scgi; };
+
+class Connect;
+
 struct Cgi
 {
     PIPENAMED Pipe;
@@ -468,6 +471,8 @@ const char* get_str_method(int i);
 
 int get_int_http_prot(char* s);
 const char* get_str_http_prot(int i);
+
+const char *get_cgi_status(CGI_STATUS n);
 
 const char* strstr_lowercase(const char* s, const char* key);
 int clean_path(char* path);

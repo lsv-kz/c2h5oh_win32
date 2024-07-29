@@ -555,6 +555,8 @@ const char *get_cgi_status(CGI_STATUS n)
             return "CGI_SEND_HTTP_HEADERS";
         case CGI_SEND_ENTITY:
             return "CGI_SEND_ENTITY";
+        case CGI_CLOSE:
+            return "CGI_CLOSE";
     }
 
     return "?";
