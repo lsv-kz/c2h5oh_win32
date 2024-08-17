@@ -164,23 +164,45 @@ int fcgi_create_connect(Connect *req)
         }
     }
 
+    int ret = -1;
     if (req->scriptType == PHPFPM)
     {
         req->fcgi.fd = create_fcgi_socket(req, conf->pathPHP_FPM.c_str());
         if (req->fcgi.fd == INVALID_SOCKET)
-            return -RS502;
+            ret = -RS502;
         else
-            return 0;
+            ret = 0;
     }
     else if (req->scriptType == FASTCGI)
-        return get_sock_fcgi(req, req->wScriptName.c_str());
+        ret = get_sock_fcgi(req, req->wScriptName.c_str());
     else
     {
         print_err(req, "<%s:%d> ? req->scriptType=%d\n", __func__, __LINE__, req->scriptType);
         return -RS500;
     }
 
-    return -1;
+    if (ret < 0)
+    {
+        return ret;
+    }
+    
+    req->fcgi.dataLen = req->cgi.len_buf = 8;
+    fcgi_set_header(req, FCGI_BEGIN_REQUEST);
+    char *p = req->cgi.buf + 8;
+    *(p++) = (unsigned char) ((FCGI_RESPONDER >> 8) & 0xff);
+    *(p++) = (unsigned char) (FCGI_RESPONDER        & 0xff);
+    *(p++) = 0;
+    *(p++) = 0;
+    *(p++) = 0;
+    *(p++) = 0;
+    *(p++) = 0;
+    *(p++) = 0;
+
+    req->cgi.status.fcgi = FASTCGI_BEGIN;
+    req->io_direct = TO_CGI;
+    req->sock_timer = 0;
+
+    return 0;
 }
 //======================================================================
 void fcgi_create_param(Connect *req)
@@ -340,19 +362,7 @@ void fcgi_create_param(Connect *req)
     req->fcgi.size_par = i;
     req->fcgi.i_param = 0;
     //----------------------------------------------
-    req->fcgi.dataLen = req->cgi.len_buf = 8;
-    fcgi_set_header(req, FCGI_BEGIN_REQUEST);
-    char *p = req->cgi.buf + 8;
-    *(p++) = (unsigned char) ((FCGI_RESPONDER >> 8) & 0xff);
-    *(p++) = (unsigned char) (FCGI_RESPONDER        & 0xff);
-    *(p++) = 0;
-    *(p++) = 0;
-    *(p++) = 0;
-    *(p++) = 0;
-    *(p++) = 0;
-    *(p++) = 0;
-
-    req->cgi.status.fcgi = FASTCGI_BEGIN;
+    req->cgi.status.fcgi = FASTCGI_PARAMS;
     req->io_direct = TO_CGI;
     req->sock_timer = 0;
     req->fcgi.http_headers_received = false;
@@ -650,8 +660,13 @@ void fcgi_worker(Connect* r)
 {
     if (r->cgi.status.fcgi == FASTCGI_CONNECT)
     {
-        if (r->io_status == WORK)
-            fcgi_create_param(r);
+        int ret = fcgi_create_connect(r);
+        if (ret < 0)
+        {
+            r->err = ret;
+            cgi_del_from_list(r);
+            end_response(r);
+        }
     }
     else if (r->cgi.status.fcgi == FASTCGI_BEGIN)
     {
@@ -661,7 +676,7 @@ void fcgi_worker(Connect* r)
             r->sock_timer = 0;
             if (r->cgi.len_buf == 0)
             {
-                r->cgi.status.fcgi = FASTCGI_PARAMS;
+                fcgi_create_param(r);
             }
         }
         else if (ret < 0)
@@ -929,6 +944,13 @@ void fcgi_worker(Connect* r)
                         }
                         else
                         {
+                            if (r->resp.respStatus == RS204)
+                            {
+                                cgi_del_from_list(r);
+                                end_response(r);
+                                return;
+                            }
+
                             r->cgi.status.fcgi = FASTCGI_SEND_ENTITY;
                             r->sock_timer = 0;
                             if (r->lenTail > 0)

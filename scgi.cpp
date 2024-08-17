@@ -12,6 +12,7 @@ int scgi_stdin(Connect *req);
 int scgi_stdout(Connect *req);
 int cgi_find_empty_line(Connect *req);
 void cgi_set_direct(Connect *r, DIRECT dir);
+int scgi_create_param(Connect *r);
 //======================================================================
 int scgi_set_size_data(Connect* r)
 {
@@ -67,6 +68,10 @@ int scgi_create_connect(Connect *r)
         print_err(r, "<%s:%d> Error connect to scgi\n", __func__, __LINE__);
         return ret;
     }
+
+    ret = scgi_create_param(r);
+    if (ret < 0)
+        return ret;
 
     return 0;
 }
@@ -227,6 +232,8 @@ int scgi_create_param(Connect *r)
     r->io_direct = TO_CGI;
     r->cgi.len_buf = 0;
     r->sock_timer = 0;
+    r->timeout = conf->TimeoutCGI;
+    r->io_status = SELECT;
 
     int ret = scgi_set_param(r);
     if (ret <= 0)
@@ -365,15 +372,12 @@ void scgi_worker(Connect* r)
 {
     if (r->cgi.status.scgi == SCGI_CONNECT)
     {
-        if (r->io_status == WORK)
+        int ret = scgi_create_connect(r);
+        if (ret < 0)
         {
-            int ret = scgi_create_param(r);
-            if (ret < 0)
-            {
-                r->err = ret;
-                cgi_del_from_list(r);
-                end_response(r);
-            }
+            r->err = ret;
+            cgi_del_from_list(r);
+            end_response(r);
         }
     }
     else if (r->cgi.status.scgi == SCGI_PARAMS)
@@ -511,6 +515,13 @@ void scgi_worker(Connect* r)
                         }
                         else
                         {
+                            if (r->resp.respStatus == RS204)
+                            {
+                                cgi_del_from_list(r);
+                                end_response(r);
+                                return;
+                            }
+
                             r->cgi.status.scgi = SCGI_SEND_ENTITY;
                             r->sock_timer = 0;
                             if (r->lenTail > 0)

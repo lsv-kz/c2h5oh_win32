@@ -14,7 +14,7 @@ static mutex mtx_;
 static condition_variable cond_;
 
 static int close_thr = 0;
-static int num_wait, num_work;
+static int num_work;
 static int n_work, n_select, n_wait_pipe;
 
 const DWORD PIPE_BUFSIZE = 1024;
@@ -145,7 +145,7 @@ void cgi_del_from_list(Connect *r)
                     //print_err(r, "<%s:%d> WAIT_OBJECT_0\n", __func__, __LINE__);
                     break;
                 case WAIT_TIMEOUT:
-                    print_err(r, "<%s:%d> WAIT_TIMEOUT\n", __func__, __LINE__);
+                    //print_err(r, "<%s:%d> WAIT_TIMEOUT\n", __func__, __LINE__);
                     if (!TerminateProcess(r->cgi.hChld, 1))
                     {
                         DWORD err = GetLastError();
@@ -177,9 +177,8 @@ void cgi_del_from_list(Connect *r)
     }
 
     r->wScriptName = L"";
-mtx_.lock();
     --num_work;
-mtx_.unlock();
+
     if (r->prev && r->next)
     {
         r->prev->next = r->next;
@@ -202,65 +201,23 @@ mtx_.unlock();
 static void cgi_add_work_list()
 {
 mtx_.lock();
-    if ((num_work < conf->MaxCgiProc) && wait_list_end)
-    {
-        int n_max = conf->MaxCgiProc - num_work;
-        Connect *r = wait_list_end;
+    int n_max = conf->MaxCgiProc - num_work;
+    Connect *r = wait_list_end;
 
-        for ( ; (n_max > 0) && r; r = wait_list_end, --n_max)
-        {
-            wait_list_end = r->prev;
-            if (wait_list_end == NULL)
-                wait_list_start = NULL;
-            --num_wait;
-            //---------------------------
-            if ((r->scriptType == CGI) || (r->scriptType == PHPCGI))
-            {
-                r->cgi.Pipe.parentPipe = INVALID_HANDLE_VALUE;
-                r->cgi.status.cgi = CGI_CREATE_PROC;
-            }
-            else if ((r->scriptType == PHPFPM) || (r->scriptType == FASTCGI))
-            {
-                r->io_direct = TO_CGI;
-                r->cgi.status.fcgi = FASTCGI_CONNECT;
-                r->fcgi.fd = INVALID_SOCKET;
-                int ret = fcgi_create_connect(r);
-                if (ret < 0)
-                {
-                    r->err = ret;
-                    end_response(r);
-                    continue;
-                }
-            }
-            else if (r->scriptType == SCGI)
-            {
-                r->io_direct = TO_CGI;
-                r->cgi.status.scgi = SCGI_CONNECT;
-                r->fcgi.fd = INVALID_SOCKET;
-                int ret = scgi_create_connect(r);
-                if (ret < 0)
-                {
-                    r->err = ret;
-                    end_response(r);
-                    continue;
-                }
-            }
-            else
-            {
-                print_err(r, "<%s:%d> cgi_type=%s\n", __func__, __LINE__, get_cgi_type(r->scriptType));
-                end_response(r);
-                continue;
-            }
-            //--------------------------
-            if (work_list_end)
-                work_list_end->next = r;
-            else
-                work_list_start = r;
-            r->prev = work_list_end;
-            r->next = NULL;
-            work_list_end = r;
-            ++num_work;
-        }
+    for ( ; (n_max > 0) && r; r = wait_list_end, --n_max)
+    {
+        wait_list_end = r->prev;
+        if (wait_list_end == NULL)
+            wait_list_start = NULL;
+        //--------------------------
+        if (work_list_end)
+            work_list_end->next = r;
+        else
+            work_list_start = r;
+        r->prev = work_list_end;
+        r->next = NULL;
+        work_list_end = r;
+        ++num_work;
     }
 mtx_.unlock();
 }
@@ -461,6 +418,30 @@ void cgi_handler()
 //======================================================================
 void push_cgi(Connect *r)
 {
+    if ((r->scriptType == CGI) || (r->scriptType == PHPCGI))
+    {
+        r->cgi.Pipe.parentPipe = INVALID_HANDLE_VALUE;
+        r->cgi.status.cgi = CGI_CREATE_PROC;
+    }
+    else if ((r->scriptType == PHPFPM) || (r->scriptType == FASTCGI))
+    {
+        r->io_direct = TO_CGI;
+        r->cgi.status.fcgi = FASTCGI_CONNECT;
+        r->fcgi.fd = INVALID_SOCKET;
+    }
+    else if (r->scriptType == SCGI)
+    {
+        r->io_direct = TO_CGI;
+        r->cgi.status.scgi = SCGI_CONNECT;
+        r->fcgi.fd = INVALID_SOCKET;
+    }
+    else
+    {
+        print_err(r, "<%s:%d> cgi_type=%s\n", __func__, __LINE__, get_cgi_type(r->scriptType));
+        end_response(r);
+        return;
+    }
+
     r->io_status = WORK;
     r->operation = DYN_PAGE;
     r->resp.respStatus = RS200;
@@ -473,7 +454,6 @@ mtx_.lock();
     wait_list_start = r;
     if (!wait_list_end)
         wait_list_end = r;
-    ++num_wait;
 mtx_.unlock();
     cond_.notify_one();
 }
@@ -711,6 +691,13 @@ static void cgi_worker(Connect* r)
                     }
                     else
                     {
+                        if (r->resp.respStatus == RS204)
+                        {
+                            cgi_del_from_list(r);
+                            end_response(r);
+                            return;
+                        }
+
                         r->cgi.status.cgi = CGI_SEND_ENTITY;
                         if (r->lenTail > 0)
                         {
