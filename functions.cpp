@@ -312,38 +312,125 @@ const char* content_type(const wchar_t* path)
     return "";
 }
 //======================================================================
-int clean_path(char* path)
+int clean_path(char *path, int len)
 {
-    int i = 0, o = 0;
+    int i = 0, j = 0, level_dir = 0;
     char ch;
+    char prev_ch = ' ';
+    int index_slash[64] = {0};
 
-    while ((ch = *(path + o)))
+    while ((ch = *(path + j)) && (len > 0))
     {
-        if (!memcmp(path + o, "/../", 4))
+        if (prev_ch == '/')
         {
-            if (i != 0)
+            if (ch == '/')
             {
-                for (--i; i > 0; --i)
-                {
-                    if (*(path + i) == '/')
-                        break;
-                }
+                --len;
+                ++j;
+                continue;
             }
-            o += 3;
+
+            switch (len)
+            {
+                case 1:
+                    if (ch == '.')
+                    {
+                        --len;
+                        ++j;
+                        continue;
+                    }
+                    break;
+                case 2:
+                    if (!memcmp(path + j, "..", 2))
+                    {
+                        if (level_dir > 1)
+                        {
+                            j += 2;
+                            len -= 2;
+                            --level_dir;
+                            i = index_slash[level_dir];
+                            continue;
+                        }
+                        else
+                        {
+                            printf("<%s:%d> *****\n", __func__, __LINE__);
+                            return -400;
+                        }
+                    }
+                    else if (!memcmp(path + j, "./", 2))
+                    {
+                        len -= 2;
+                        j += 2;
+                        continue;
+                    }
+                    break;
+                case 3:
+                    if (!memcmp(path + j, "../", 3))
+                    {
+                        if (level_dir > 1)
+                        {
+                            j += 3;
+                            len -= 3;
+                            --level_dir;
+                            i = index_slash[level_dir];
+                            continue;
+                        }
+                        else
+                        {
+                            return -400;
+                        }
+                    }
+                    else if (!memcmp(path + j, "./.", 3))
+                    {
+                        len -= 3;
+                        j += 3;
+                        continue;
+                    }
+                    break;
+                default:
+                    if (!memcmp(path + j, "../", 3))
+                    {
+                        if (level_dir > 1)
+                        {
+                            j += 3;
+                            len -= 3;
+                            --level_dir;
+                            i = index_slash[level_dir];
+                            continue;
+                        }
+                        else
+                        {
+                            return -400;
+                        }
+                    }
+                    else if (!memcmp(path + j, "./", 2))
+                    {
+                        len -= 2;
+                        j += 2;
+                        continue;
+                    }
+                    else if (ch == '.')
+                    {
+                        //*(path + i) = 0;
+                        return -404;
+                    }
+            }
         }
-        else if (!memcmp(path + o, "//", 2))
-            o += 1;
-        else if (!memcmp(path + o, "/./", 3))
-            o += 2;
-        else
+
+        if (level_dir >= (int)(sizeof(index_slash)/sizeof(int)))
+            return -404;
+        *(path + i) = ch;
+        ++i;
+        ++j;
+        --len;
+        prev_ch = ch;
+        if (ch == '/')
         {
-            if (o != i)
-                * (path + i) = ch;
-            ++i;
-            ++o;
+            ++level_dir;
+            index_slash[level_dir] = i;
         }
     }
-
+    
     *(path + i) = 0;
 
     return i;

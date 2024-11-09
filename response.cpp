@@ -206,7 +206,8 @@ void parse_request_thread()
             req->uriLen = strlen(req->uri);
         }
 
-        if (decode(req->uri, req->uriLen, req->decodeUri, sizeof(req->decodeUri)) <= 0)
+        int len = decode(req->uri, req->uriLen, req->decodeUri, sizeof(req->decodeUri));
+        if (len <= 0)
         {
             print_err(req, "<%s:%d> Error: decode URI\n", __func__, __LINE__);
             req->err = -RS404;
@@ -215,7 +216,20 @@ void parse_request_thread()
             continue;
         }
 
-        clean_path(req->decodeUri);
+        len = clean_path(req->decodeUri, len);
+        if (len <= 0)
+        {
+			print_err(req, "<%s:%d> Error URI=%s\n", __func__, __LINE__, req->decodeUri);
+            req->lenDecodeUri = 0;
+            if (len == 0)
+                req->err = -RS400;
+            else
+                req->err = len;
+            if (exit_thread(req))
+                return;
+            continue;
+		}
+		req->lenDecodeUri = len;
         //--------------------------------------------------------------
         int n = utf8_to_utf16(req->decodeUri, req->wDecodeUri);
         if (n)
@@ -369,18 +383,20 @@ int prepare_response(Connect* req)
         if ((!(st64.st_mode & _S_IFDIR)) && (!(st64.st_mode & _S_IFREG)))
         {
             print_err(req, "<%s:%d> Error: file (!S_ISDIR && !S_ISREG) \n", __func__, __LINE__);
-            return -RS403;
+            return -RS404;
         }
     }
     //------------------------------------------------------------------
     DWORD attr = GetFileAttributesW(wPath.c_str());
     if (attr == INVALID_FILE_ATTRIBUTES)
     {
-        PrintError(__func__, __LINE__, "GetFileAttributesW", GetLastError());
+        DWORD err = GetLastError();
+        PrintError(__func__, __LINE__, "GetFileAttributesW", err);
+        if (err == ERROR_FILE_NOT_FOUND)
+			return -RS404;
         return -RS500;
     }
-
-    if (attr & FILE_ATTRIBUTE_HIDDEN)
+    else if (attr & FILE_ATTRIBUTE_HIDDEN)
     {
         print_err(req, "<%s:%d> Hidden\n", __func__, __LINE__);
         return -RS404;
@@ -396,15 +412,15 @@ int prepare_response(Connect* req)
             return options(req);
         }
 
-        if (req->uri[req->uriLen - 1] != '/')
+        if (req->decodeUri[req->lenDecodeUri - 1] != '/')
         {
             req->uri[req->uriLen] = '/';
             req->uri[req->uriLen + 1] = '\0';
             req->resp.respStatus = RS301;
 
-            String hdrs(127);
-            hdrs << "Location: " << req->uri << "\r\n";
-            if (hdrs.error())
+            req->hdrs.reserve(127);
+            req->hdrs << "Location: " << req->uri << "\r\n";
+            if (req->hdrs.error())
             {
                 print_err(req, "<%s:%d> Error create_header()\n", __func__, __LINE__);
                 return -RS500;

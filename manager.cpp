@@ -54,8 +54,8 @@ void end_response(Connect* req)
         if (req->err <= -RS101) // err < -100
         {
             req->resp.respStatus = -req->err;
-            req->err = -1;
-            req->connKeepAlive = 0;
+            //req->err = -1;
+            //req->connKeepAlive = 0;
             if (send_message(req, NULL) == 1)
                 return;
         }

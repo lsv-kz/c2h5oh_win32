@@ -237,6 +237,7 @@ public:
     hdr  arrHdrs[MAX_HEADERS + 1];
 
     char  decodeUri[SIZE_BUF_REQUEST];
+    unsigned int lenDecodeUri;
 
     std::wstring  wDecodeUri;
 
@@ -475,7 +476,7 @@ const char* get_str_http_prot(int i);
 const char *get_cgi_status(CGI_STATUS n);
 
 const char* strstr_lowercase(const char* s, const char* key);
-int clean_path(char* path);
+int clean_path(char* path, int len);
 
 const char* content_type(const wchar_t* path);
 int parse_startline_request(Connect* r, char* s, int len);

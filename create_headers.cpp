@@ -74,7 +74,6 @@ int create_response_headers(Connect* req)
 //=====================================================================
 int send_message(Connect* r, const char* msg)
 {
-    r->hdrs = "";
     r->html.s = "";
     r->mode_send = NO_CHUNK;
     r->html.s.reserve(256);
