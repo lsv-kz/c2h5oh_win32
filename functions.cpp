@@ -318,6 +318,7 @@ int clean_path(char *path, int len)
     char ch;
     char prev_ch = ' ';
     int index_slash[64] = {0};
+    int index_dot = 0;
 
     while ((ch = *(path + j)) && (len > 0))
     {
@@ -353,8 +354,7 @@ int clean_path(char *path, int len)
                         }
                         else
                         {
-                            printf("<%s:%d> *****\n", __func__, __LINE__);
-                            return -400;
+                            return -RS400;
                         }
                     }
                     else if (!memcmp(path + j, "./", 2))
@@ -377,10 +377,16 @@ int clean_path(char *path, int len)
                         }
                         else
                         {
-                            return -400;
+                            return -RS400;
                         }
                     }
                     else if (!memcmp(path + j, "./.", 3))
+                    {
+                        len -= 3;
+                        j += 3;
+                        continue;
+                    }
+                    else if (!memcmp(path + j, ".//", 3))
                     {
                         len -= 3;
                         j += 3;
@@ -400,7 +406,7 @@ int clean_path(char *path, int len)
                         }
                         else
                         {
-                            return -400;
+                            return -RS400;
                         }
                     }
                     else if (!memcmp(path + j, "./", 2))
@@ -411,14 +417,26 @@ int clean_path(char *path, int len)
                     }
                     else if (ch == '.')
                     {
-                        //*(path + i) = 0;
-                        return -404;
+                        return -RS404;
                     }
             }
         }
+        else if (prev_ch == '.')
+        {
+            if (ch == '/')
+            {
+                i = index_dot;
+                index_dot = 0;
+            }
+            else if (ch != '.')
+                index_dot = 0;
+        }
 
-        if (level_dir >= (int)(sizeof(index_slash)/sizeof(int)))
-            return -404;
+        if ((ch == '.') && (index_dot == 0))
+        {
+            index_dot = i;
+        }
+
         *(path + i) = ch;
         ++i;
         ++j;
@@ -426,11 +444,15 @@ int clean_path(char *path, int len)
         prev_ch = ch;
         if (ch == '/')
         {
+            if (level_dir >= (int)(sizeof(index_slash)/sizeof(int)))
+                return -404;
             ++level_dir;
             index_slash[level_dir] = i;
         }
     }
     
+    if (index_dot)
+        i = index_dot;
     *(path + i) = 0;
 
     return i;
